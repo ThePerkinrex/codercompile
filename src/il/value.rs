@@ -1,19 +1,20 @@
 use std::fmt::Display;
-use super::Block;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Value {
-    // Basic types
+    // Basic values
     Int(isize),
     Uint(usize),
     Byte(u8),
     Char(char),
     Bool(bool),
     List(Vec<Value>),
-    Function(usize, String, Block, Vec<(String, Value)>),
-    // TODO: add object type
 
-    Name(usize, String),
+    Custom(Type, Vec<(String, Value)>),
+
+    Type(Type),
+
+    Name(String),
 
     // operations
     Greater(Box<Value>, Box<Value>),
@@ -38,6 +39,8 @@ pub enum Value {
     BitwiseNot(Box<Value>),
     BitwiseShift(Box<Value>, Box<Value>),
     BitwiseUnshift(Box<Value>, Box<Value>),
+
+    FnCall(String, Vec<Value>),
 }
 
 impl Display for Value {
@@ -47,7 +50,7 @@ impl Display for Value {
             Value::Uint(i) => write!(f, "{}", i),
             Value::Byte(b) => write!(f, "{:02X}", b),
             Value::Char(c) => write!(f, "{}", c),
-            Value::Bool(b) => write!(f, "{}", if *b {"true"} else {"false"}),
+            Value::Bool(b) => write!(f, "{}", if *b { "true" } else { "false" }),
             Value::List(l) => write!(f, "[{}]", {
                 let mut res = format!("{}", l[0]);
                 for i in 1..l.len() {
@@ -56,9 +59,19 @@ impl Display for Value {
                 res
             }),
 
-            Value::Name(id, s) => write!(f, "({}#{})", s, id),
+            Value::Custom(t, v) => write!(
+                f,
+                "{} {{\n{}\n}}",
+                t,
+                v.iter()
+                    .map(|(name, value)| { format!("{} = {}", name, value) })
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            ),
 
-            Value::Function(id, name, _code, args) => write!(f, "({}#{})({})", name, id, args.iter().map(|x| {format!("{}: {}", x.0, x.1)}).collect::<Vec<String>>().join(", ")),
+            Value::Type(t) => write!(f, "{}", t),
+
+            Value::Name(s) => write!(f, "{}", s),
 
             // operations
             Value::Greater(lhs, rhs) => write!(f, "{} > {}", lhs, rhs),
@@ -80,10 +93,49 @@ impl Display for Value {
             Value::BitwiseAnd(lhs, rhs) => write!(f, "{} & {}", lhs, rhs),
             Value::BitwiseOr(lhs, rhs) => write!(f, "{} | {}", lhs, rhs),
             Value::BitwiseXor(lhs, rhs) => write!(f, "{} ^ {}", lhs, rhs),
-            Value::BitwiseNot(v) => write!(f, "~{}",v),
+            Value::BitwiseNot(v) => write!(f, "~{}", v),
             Value::BitwiseShift(lhs, rhs) => write!(f, "{} << {}", lhs, rhs),
             Value::BitwiseUnshift(lhs, rhs) => write!(f, "{} >> {}", lhs, rhs),
+
+            Value::FnCall(name, args) => write!(f, "{}({})", name, args.iter().map(|x| {format!("{}", x)}).collect::<Vec<String>>().join(", "))
         }?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Type {
+    // Basic types
+    Null,
+    Int,
+    Uint,
+    Byte,
+    Char,
+    Bool,
+    List,
+    Array(Box<Type>),
+
+    Custom(String),
+    Function(Vec<Type>, Box<Type>),
+    Union(Vec<Type>)
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        match self {
+            Type::Array(t) => write!(f, "[{}]", t)?,
+            Type::Custom(c) => write!(f, "{}", c)?,
+            Type::Function(args, res) => write!(
+                f,
+                "({}): {}",
+                args.iter()
+                    .map(|x| { format!("{}", x) })
+                    .collect::<Vec<String>>()
+                    .join(", "),
+                res
+            )?,
+            _ => write!(f, "{:?}", self)?,
+        };
         Ok(())
     }
 }
